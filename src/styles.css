@@ -1,0 +1,731 @@
+:root {
+  --bg: #0d1b2a;
+  --panel: #13283a;
+  --frame: #2e4a5e;
+  --cyan: #00f5ff;
+  --text: #e8f6ff;
+  --dim: #8fb3c4;
+
+  /* Motion tokens — strong custom curves (built-ins lack punch) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  --t-press: 130ms;
+  --t-enter: 220ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #05080c;
+  font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-root {
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  aspect-ratio: 16 / 9;
+}
+
+#game-root canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ── HUD(中性,無任何測評資訊)── */
+#hud {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  white-space: nowrap;
+  gap: 24px;
+  align-items: center;
+  background: rgba(13, 27, 42, 0.66);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  border: 1px solid var(--frame);
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--dim);
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(2, 10, 22, 0.5);
+  /* replays on each display:none -> flex (i.e. when HUD first appears) */
+  animation: hudDrop 320ms var(--ease-out);
+}
+
+@keyframes hudDrop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+.hud-item strong {
+  color: var(--text);
+  font-family: "Courier New", monospace;
+}
+
+.hud-save {
+  pointer-events: auto;
+  border: 1px solid var(--frame);
+  border-radius: 5px;
+  padding: 4px 10px;
+  background: rgba(10, 20, 29, 0.88);
+  color: var(--cyan);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms var(--ease-out), color 140ms var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+.hud-save:hover {
+  color: var(--text);
+  border-color: var(--cyan);
+}
+
+.hud-save:active {
+  transform: scale(0.96);
+}
+
+.repair {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.repair-track {
+  width: 110px;
+  height: 8px;
+  background: #0a141d;
+  border: 1px solid var(--frame);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#repair-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #0bbfd0, var(--cyan));
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.6);
+  /* progress only ever grows; ease-out reads as "settling into place" */
+  transition: width 600ms var(--ease-out);
+}
+
+/* ── 對話框 ── */
+#dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 4vh;
+  transform: translateX(-50%);
+  width: min(860px, 92vw);
+  background: rgba(11, 22, 34, 0.8);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border: 1.5px solid var(--frame);
+  border-radius: 8px;
+  padding: 14px 22px 18px;
+  z-index: 6;
+  box-shadow: 0 16px 40px rgba(2, 10, 22, 0.55), inset 0 1px 0 rgba(143, 179, 196, 0.06);
+  /* entrance replays only when box goes hidden -> shown (once per sequence) */
+  animation: dialogueIn var(--t-enter) var(--ease-out);
+}
+
+@keyframes dialogueIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(14px) scale(0.985);
+  }
+}
+
+#speaker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  padding: 2px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--frame);
+  border-radius: 3px;
+  background: #0a141d;
+  color: var(--cyan);
+  transition: color 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+
+/* accent dot keyed to the speaker colour */
+#speaker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+#speaker[data-style="kyle"] {
+  color: #ffab40;
+  border-color: rgba(255, 171, 64, 0.45);
+}
+
+#speaker[data-style="self"] {
+  color: #b0bec5;
+  border-color: rgba(176, 190, 197, 0.4);
+}
+
+#speaker[data-style="system"] {
+  color: #e63946;
+  border-color: rgba(230, 57, 70, 0.45);
+}
+
+#dialogue-text {
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 1.75;
+  min-height: 56px;
+}
+
+#continue-hint {
+  position: absolute;
+  right: 18px;
+  bottom: 8px;
+  color: var(--cyan);
+  /* seen constantly → keep it gentle (small travel, soft pulse) */
+  animation: hintPulse 1.4s var(--ease-in-out) infinite;
+  font-size: 13px;
+}
+
+@keyframes hintPulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(3px);
+    opacity: 1;
+  }
+}
+
+/* 選項:等寬等色,絕不暗示「較佳選項」 */
+#choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.choice {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--text);
+  background: #0e1d2a;
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease-out), background 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+  /* fresh DOM every choose() → staggered cascade plays each time */
+  opacity: 0;
+  transform: translateY(8px);
+  animation: choiceIn 260ms var(--ease-out) forwards;
+}
+
+.choice:nth-child(1) {
+  animation-delay: 40ms;
+}
+.choice:nth-child(2) {
+  animation-delay: 90ms;
+}
+.choice:nth-child(3) {
+  animation-delay: 140ms;
+}
+.choice:nth-child(4) {
+  animation-delay: 190ms;
+}
+
+@keyframes choiceIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* hover only on real pointers (touch fires hover on tap) */
+@media (hover: hover) and (pointer: fine) {
+  .choice:hover {
+    background: #16344a;
+    box-shadow: 0 0 0 1px rgba(0, 245, 255, 0.35), 0 6px 18px rgba(0, 245, 255, 0.12);
+  }
+}
+
+/* instant, tactile press feedback */
+.choice:active {
+  transform: scale(0.985);
+  background: #1a3a52;
+}
+
+/* ── 系統字卡 ── */
+#syscard {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8;
+  animation: cardFade 360ms var(--ease-out);
+}
+
+@keyframes cardFade {
+  from {
+    opacity: 0;
+  }
+}
+
+#syscard-text {
+  font-family: "Courier New", monospace;
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  text-align: center;
+  max-width: 80vw;
+  line-height: 2;
+  text-shadow: 0 0 24px rgba(0, 245, 255, 0.3);
+}
+
+/* ── 封面(OPUS 風:細字、寬字距、大量留白)── */
+#title-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* left scrim lifts the wordmark off the busy console art */
+#title-ui::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(5, 8, 12, 0.92) 0%,
+    rgba(5, 8, 12, 0.78) 20%,
+    rgba(5, 8, 12, 0.34) 42%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+#title-block {
+  position: absolute;
+  left: 7%;
+  top: 50%;
+  transform: translateY(-58%);
+  color: var(--text);
+}
+
+.title-eyebrow {
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-size: clamp(10px, 1.1vw, 14px);
+  font-weight: 300;
+  letter-spacing: 0.65em;
+  color: var(--dim);
+  margin-bottom: 2.2em;
+  animation: titleFade 1.2s var(--ease-out) both;
+}
+
+.title-main {
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-size: clamp(34px, 5vw, 72px);
+  font-weight: 200;
+  letter-spacing: 0.32em;
+  line-height: 1.28;
+  margin: 0;
+  text-shadow: 0 0 40px rgba(0, 245, 255, 0.25);
+  animation: titleFade 1.3s 0.3s var(--ease-out) both;
+}
+
+.title-rule {
+  width: 7.5em;
+  height: 1px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+  margin: 1.6em 0 1.4em;
+  transform-origin: left center;
+  animation: ruleWipe 1s 0.8s var(--ease-out) both;
+}
+
+@keyframes ruleWipe {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.title-sub {
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-size: clamp(13px, 1.5vw, 20px);
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  color: var(--cyan);
+  animation: titleFade 1.2s 1s var(--ease-out) both;
+}
+
+.title-sub-zh {
+  font-size: clamp(10px, 1vw, 13px);
+  letter-spacing: 0.32em;
+  color: var(--dim);
+  margin-top: 1.1em;
+  animation: titleFade 1.2s 1.2s var(--ease-out) both;
+}
+
+#title-cta {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  transform: translateX(-50%);
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.55em;
+  color: var(--text);
+  opacity: 0;
+  animation: ctaBlink 2.4s 1.8s var(--ease-in-out) infinite;
+}
+
+#language-menu {
+  position: absolute;
+  left: 7%;
+  bottom: 21%;
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+  animation: titleFade 1.2s 1.25s var(--ease-out) both;
+}
+
+.lang-btn {
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  background: rgba(10, 20, 29, 0.58);
+  border: 1px solid var(--frame);
+  border-radius: 5px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 140ms var(--ease-out), border-color 140ms var(--ease-out),
+    background 140ms var(--ease-out);
+}
+
+.lang-btn:hover,
+.lang-btn.active {
+  color: var(--text);
+  border-color: var(--cyan);
+  background: rgba(0, 245, 255, 0.1);
+}
+
+/* 封面:續玩 / 重新開始 */
+#title-actions {
+  position: absolute;
+  left: 7%;
+  bottom: 12%;
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+  animation: titleFade 1.2s 1.4s var(--ease-out) both;
+}
+
+.title-btn {
+  font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: #05080c;
+  background: var(--cyan);
+  border: 1px solid var(--cyan);
+  border-radius: 5px;
+  padding: 11px 26px;
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease-out), box-shadow 160ms var(--ease-out),
+    background 160ms var(--ease-out);
+}
+
+.title-btn:hover {
+  box-shadow: 0 6px 22px rgba(0, 245, 255, 0.3);
+}
+
+.title-btn:active {
+  transform: scale(0.97);
+}
+
+.title-btn.ghost {
+  color: var(--dim);
+  background: transparent;
+  border-color: var(--frame);
+}
+
+.title-btn.ghost:hover {
+  color: var(--text);
+  border-color: var(--dim);
+  box-shadow: none;
+}
+
+/* 對話節奏控制列 */
+#pacing {
+  position: absolute;
+  right: 18px;
+  bottom: calc(4vh + 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 7;
+  font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+  animation: gentleFade 200ms var(--ease-out);
+}
+
+#pacing button {
+  font: inherit;
+  font-size: 12px;
+  color: var(--dim);
+  background: rgba(13, 27, 42, 0.66);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--frame);
+  border-radius: 5px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease-out), color 140ms var(--ease-out),
+    border-color 140ms var(--ease-out);
+}
+
+#pacing button:hover {
+  color: var(--text);
+  border-color: var(--dim);
+}
+
+#pacing button:active {
+  transform: scale(0.96);
+}
+
+#pacing button.on {
+  color: #05080c;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.pace-hint {
+  font-size: 11px;
+  color: #5e7a8a;
+  letter-spacing: 0.05em;
+}
+
+@keyframes gentleFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes titleFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ctaBlink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* ── VN 立繪 ── */
+#portrait {
+  position: absolute;
+  left: 50%;
+  bottom: calc(4vh + 150px);
+  transform: translateX(calc(-50% - 330px));
+  z-index: 5;
+  pointer-events: none;
+  /* soft rise when a portrait first appears */
+  animation: portraitIn 240ms var(--ease-out);
+}
+
+@keyframes portraitIn {
+  from {
+    opacity: 0;
+  }
+}
+
+#portrait-frame {
+  width: 210px;
+  height: 270px;
+  overflow: hidden;
+  border: 2px solid var(--frame);
+  border-radius: 8px;
+  background: rgba(10, 20, 29, 0.88);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 34px rgba(2, 10, 22, 0.6);
+  /* accent colour cross-fades between speakers (set inline in JS) */
+  transition: border-color 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
+}
+
+#portrait-frame.speak {
+  animation: speakBounce 0.36s var(--ease-out);
+}
+
+@keyframes speakBounce {
+  0% {
+    transform: translateY(0);
+  }
+  32% {
+    transform: translateY(-11px);
+  }
+  64% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+#portrait-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+}
+
+#portrait-badge {
+  font-size: 96px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── 鍵盤可及性:focus-visible 焦點環(滑鼠點按不顯示,鍵盤導覽才顯示)── */
+.choice:focus-visible,
+.title-btn:focus-visible,
+.lang-btn:focus-visible,
+#pacing button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 245, 255, 0.18);
+}
+
+/* 滑鼠點按時不殘留焦點外框(focus-visible 已涵蓋鍵盤路徑) */
+.choice:focus:not(:focus-visible),
+.title-btn:focus:not(:focus-visible),
+.lang-btn:focus:not(:focus-visible),
+#pacing button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── CRT 掃描線(輕度 juice)── */
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 3px,
+    rgba(0, 0, 0, 0.07) 3px,
+    rgba(0, 0, 0, 0.07) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* ── 動暈症友善:保留淡入/顏色,移除位移與循環動畫 ── */
+@media (prefers-reduced-motion: reduce) {
+  #hud,
+  #dialogue,
+  #portrait,
+  .choice,
+  .title-eyebrow,
+  .title-main,
+  .title-sub,
+  .title-sub-zh,
+  #syscard {
+    animation-duration: 200ms;
+    animation-name: gentleFade;
+  }
+
+  .title-rule {
+    animation: gentleFade 200ms var(--ease-out) both;
+    transform: none;
+  }
+
+  #continue-hint {
+    animation: hintFadeOnly 1.4s var(--ease-in-out) infinite;
+  }
+
+  #portrait-frame.speak {
+    animation: none;
+  }
+
+  .choice {
+    opacity: 1;
+    transform: none;
+  }
+
+  #repair-fill {
+    transition-duration: 200ms;
+  }
+
+  @keyframes gentleFade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes hintFadeOnly {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}

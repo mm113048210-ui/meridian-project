@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>星火號 MERIDIAN ─ 最後不能被壓縮的 14%</title>
+    <meta
+      name="description"
+      content="一場關於「你是誰」的太空敘事測驗。在星火號上喚醒六位專員,你的每一個選擇都在重新畫出一張人類的自畫像。"
+    />
+    <meta name="theme-color" content="#05080c" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Project Meridian ─ The Last 14%" />
+    <meta
+      property="og:description"
+      content="一場關於「你是誰」的太空敘事測驗。你的每一個選擇,都是人類在重新畫一次自畫像。"
+    />
+    <!-- 內嵌 SVG favicon:OTIS 訊號標記(青色同心環) -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305080c'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2300f5ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%2300f5ff'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-root"></div>
+
+      <!-- HUD:只允許中性資訊(時間/修復度)。⛔ 禁止任何 RIASEC 元素 -->
+      <div id="hud" class="hidden" aria-live="polite">
+        <div class="hud-item"><span data-zh="維生倒數" data-en="Life support">維生倒數</span> <strong id="hours">168</strong>h</div>
+        <div class="hud-item repair">
+          <span data-zh="系統修復度" data-en="System repair">系統修復度</span>
+          <div class="repair-track"><div id="repair-fill"></div></div>
+        </div>
+        <button id="save-button" class="hud-save hidden" type="button" data-zh="存檔" data-en="Save">存檔</button>
+      </div>
+
+      <!-- 封面(OPUS 風極簡英文版) -->
+      <div id="title-ui" class="hidden">
+        <div id="title-block">
+          <div class="title-eyebrow">MERIDIAN&nbsp;PROGRAM</div>
+          <h1 class="title-main">PROJECT<br />MERIDIAN</h1>
+          <div class="title-rule"></div>
+          <div class="title-sub">THE&nbsp;LAST&nbsp;14%</div>
+          <div class="title-sub-zh">最後不能被壓縮的 14%</div>
+        </div>
+        <div id="language-menu" aria-label="Language">
+          <button id="lang-zh" class="lang-btn" type="button">中文</button>
+          <button id="lang-en" class="lang-btn" type="button">English</button>
+        </div>
+        <div id="title-cta" data-zh="點擊開始" data-en="CLICK TO BEGIN">點擊開始</div>
+        <!-- 有存檔時顯示:續玩 / 重新開始 -->
+        <div id="title-actions" class="hidden">
+          <button id="btn-continue" class="title-btn" data-zh="繼續航程" data-en="Continue">繼續航程</button>
+          <button id="btn-newgame" class="title-btn ghost" data-zh="重新開始" data-en="New Run">重新開始</button>
+        </div>
+      </div>
+
+      <!-- VN 立繪 -->
+      <div id="portrait" class="hidden">
+        <div id="portrait-frame">
+          <img id="portrait-img" alt="" />
+          <div id="portrait-badge" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- 對話框 -->
+      <div id="dialogue" class="hidden">
+        <div id="speaker" data-style="otis">奧提斯</div>
+        <p id="dialogue-text"></p>
+        <div id="continue-hint" class="hidden">▼</div>
+        <div id="choices" class="hidden"></div>
+      </div>
+
+      <!-- 對話節奏控制列(只在對話時顯示) -->
+      <div id="pacing" class="hidden">
+        <button id="pace-speed">文字速度:標準</button>
+        <span class="pace-hint" data-zh="點擊或按 Space / Enter 繼續" data-en="Click or press Space / Enter to continue">點擊或按 Space / Enter 繼續</span>
+      </div>
+
+      <!-- 全幕系統字卡 -->
+      <div id="syscard" class="hidden"><p id="syscard-text"></p></div>
+
+      <div id="scanlines"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -4,6 +4,8 @@ import { sfx } from "../ui/sfx";
 import { fitCover } from "./TitleScene";
 import { flow, type PipeVariant } from "../game/flow";
 import { tt } from "../game/lang";
+import { createNudge, type NudgeHandle } from "../ui/nudge";
+import { installAmbientDrift, installPointerParallax, installRoomAmbience, installVignette } from "../ui/ambient";
 
 function flowVariant(): PipeVariant {
   return flow.pipeVariant;
@@ -62,6 +64,7 @@ export class PipePuzzleScene extends Phaser.Scene {
   private from = "modules";
   private ghosts: Phaser.GameObjects.Container[] = [];
   private lastProg = -2;
+  private nudge?: NudgeHandle;
 
   constructor() {
     super("pipepuzzle");
@@ -81,10 +84,14 @@ export class PipePuzzleScene extends Phaser.Scene {
     const bg = this.add.image(480, 270, "powerbay");
     fitCover(bg, 960, 540);
     this.add.rectangle(480, 270, 960, 540, 0x06090d, 0.78);
+    installVignette(this, { depth: 3 });
+    installAmbientDrift(this, { color: 0xffab40, count: 16, depth: 4, alphaScale: 1.25, sizeScale: 1.1 });
+    installRoomAmbience(this, "powerbay", 5);
+    installPointerParallax(this, bg, { strength: 8, duration: 480 });
 
     this.makeTextures();
     this.add
-      .text(480, 36, tt("接通冷卻管:把管件拖進凹槽,點擊已放置的管件可旋轉", "Reconnect coolant pipes: drag pieces into sockets; click placed pieces to rotate"), {
+      .text(480, 36, tt("接通冷卻管:拖管件進凹槽,點一下管件可旋轉", "Reconnect coolant pipes: drag pieces into sockets; tap a piece to rotate"), {
         fontFamily: "sans-serif",
         fontSize: "16px",
         color: "#cfe9f5",
@@ -95,6 +102,19 @@ export class PipePuzzleScene extends Phaser.Scene {
     this.spawnTray();
     this.setupDrag();
     this.updateFlow();
+
+    // 漸進提示:凱爾(粗、動手派)。先點原則,最後直指方法;再卡才出「接手」。
+    this.nudge = createNudge(this, {
+      speaker: "凱爾",
+      accent: 0xffab40,
+      anchor: { x: 24, y: 92 },
+      lines: [
+        { zh: "別瞪著它。把管件拖進凹槽,缺口對缺口就接上了。", en: "Don't just stare. Drag the pieces into the sockets — line the openings up and they connect." },
+        { zh: "接不通就是某一段轉錯方向 —— 點一下那個管件,它會轉 90 度。", en: "If flow stops, one piece is facing wrong — tap it and it rotates 90 degrees." },
+        { zh: "順著水流從左接到右,一段一段補,別跳著弄。", en: "Follow the water left to right, fill one segment at a time — don't jump around." },
+      ],
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.nudge?.destroy());
 
     // 45 秒後出現「請奧提斯協助」(不扣分,只記遙測)
     this.time.delayedCall(45_000, () => {
@@ -253,6 +273,21 @@ export class PipePuzzleScene extends Phaser.Scene {
 
   private setupDrag() {
     let dragStartSlot: number | null = null;
+    let didDrag = false;
+
+    // 移動超過門檻才算「拖曳」,避免點擊旋轉時的微小晃動被誤判成拖曳。
+    this.input.dragDistanceThreshold = 10;
+
+    // 每次按下先清旗標;只有真的開始拖曳才會設為 true(放開時據此決定是否旋轉)。
+    this.input.on("pointerdown", () => {
+      didDrag = false;
+    });
+
+    this.input.on("dragstart", (_p: unknown, obj: Phaser.GameObjects.Image) => {
+      const piece = obj.getData("piece") as PlacedPiece | undefined;
+      if (!piece || piece.locked || this.solved) return;
+      didDrag = true;
+    });
 
     this.input.on("drag", (_p: unknown, obj: Phaser.GameObjects.Image, x: number, y: number) => {
       const piece = obj.getData("piece") as PlacedPiece;
@@ -270,9 +305,9 @@ export class PipePuzzleScene extends Phaser.Scene {
       const piece = obj.getData("piece") as PlacedPiece;
       if (piece.locked || this.solved) return;
       obj.setDepth(1);
-      // 找最近空凹槽
+      // 找最近空凹槽(放寬吸附半徑,較好對準)
       let best = -1;
-      let bestD = 48;
+      let bestD = 58;
       PATH.forEach((_, i) => {
         if (this.slots[i]) return;
         const { x, y } = this.cellXY(i);
@@ -304,13 +339,12 @@ export class PipePuzzleScene extends Phaser.Scene {
       this.updateFlow();
     });
 
-    // 點擊旋轉(放置後)
+    // 點擊旋轉:純點擊(本次手勢未發生拖曳)就旋轉,托盤或已放置的管件皆可。
+    // didDrag 在 pointerdown 清空、dragstart 設定,因此不受 dragend/gameobjectup 觸發順序影響。
     this.input.on("gameobjectup", (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
       const piece = (obj as Phaser.GameObjects.Image).getData?.("piece") as PlacedPiece | undefined;
+      if (didDrag) return; // 這次手勢是拖曳 → 不旋轉
       if (!piece || piece.locked || this.solved) return;
-      const pointer = _p;
-      if (pointer.getDuration() > 200) return; // 拖曳不旋轉
-      if (piece.slot === null) return;
       piece.rot = (piece.rot + 1) % 4;
       this.rotations += 1;
       sfx.rotate();
@@ -383,6 +417,7 @@ export class PipePuzzleScene extends Phaser.Scene {
         this.tweens.add({ targets: surge, alpha: 0, scale: 1.25, duration: 320, onComplete: () => surge.destroy() });
       }
       sfx.snap();
+      this.nudge?.progress(); // 水流有推進 → 別嘮叨
     }
     this.lastProg = prog;
 
@@ -425,6 +460,7 @@ export class PipePuzzleScene extends Phaser.Scene {
 
   private onSolved() {
     this.solved = true;
+    this.nudge?.solved();
     this.steam.stop();
     sfx.solve();
     this.cameras.main.flash(200, 53, 224, 200);

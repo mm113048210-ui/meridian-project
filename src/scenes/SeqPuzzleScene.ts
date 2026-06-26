@@ -2,6 +2,8 @@ import Phaser from "phaser";
 import { riasec } from "../game/riasec";
 import { sfx } from "../ui/sfx";
 import { tt } from "../game/lang";
+import { createNudge, type NudgeHandle } from "../ui/nudge";
+import { installAmbientDrift } from "../ui/ambient";
 
 // I-3:生化隔離 SOP 步驟排序(拖曳重排)。表現不計分,只記遙測。
 const STEPS = [
@@ -34,6 +36,7 @@ export class SeqPuzzleScene extends Phaser.Scene {
   private startedAt = 0;
   private dragsCount = 0;
   private from = "modules";
+  private nudge?: NudgeHandle;
 
   constructor() {
     super("seqpuzzle");
@@ -47,6 +50,7 @@ export class SeqPuzzleScene extends Phaser.Scene {
     this.startedAt = this.time.now;
     this.cameras.main.fadeIn(350, 0, 0, 0);
     this.add.rectangle(480, 270, 960, 540, 0x06090d, 0.9);
+    installAmbientDrift(this, { color: 0x69f0ae, count: 20, depth: 2, alphaScale: 1.45, sizeScale: 1.25 });
     this.add
       .text(480, 52, tt("排出正確的隔離程序:拖曳步驟卡重新排序", "Arrange the isolation procedure: drag the cards into order"), {
         fontFamily: "sans-serif",
@@ -60,6 +64,19 @@ export class SeqPuzzleScene extends Phaser.Scene {
     if (this.order.every((v, i) => v === i)) this.order.reverse();
 
     this.order.forEach((stepIdx, slot) => this.spawnCard(stepIdx, slot));
+
+    // 漸進提示:艾莉絲(乾、聰明)。先點原則,最後給接近完整的順序;再卡才出「接手」。
+    this.nudge = createNudge(this, {
+      speaker: "艾莉絲",
+      accent: 0x448aff,
+      anchor: { x: 24, y: 300 },
+      lines: [
+        { zh: "卡住了?這是標準作業流程 —— 想想做危險實驗的安全順序。", en: "Stuck? It's a standard operating procedure — think about the safe order for a hazardous experiment." },
+        { zh: "原則很簡單:永遠先保護自己,最後才歸檔。防護服在最前。", en: "Simple rule: protect yourself first, file the record last. The suit goes first." },
+        { zh: "順序大致是:防護 → 封閉通風 → 負壓場 → 轉移樣本 → 密封艙門 → 消毒 → 歸檔。", en: "Roughly: suit up → seal vents → negative-pressure field → transfer → seal doors → sterilize → file." },
+      ],
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.nudge?.destroy());
 
     this.time.delayedCall(45_000, () => {
       if (this.solved) return;
@@ -118,6 +135,7 @@ export class SeqPuzzleScene extends Phaser.Scene {
       c.setDepth(1);
       this.layout();
       sfx.snap();
+      this.nudge?.progress(); // 有在動 → 別急著嘮叨
       this.check();
     });
   }
@@ -134,6 +152,7 @@ export class SeqPuzzleScene extends Phaser.Scene {
     if (this.solved) return;
     if (!this.order.every((v, i) => v === i)) return;
     this.solved = true;
+    this.nudge?.solved();
     sfx.solve();
     this.cameras.main.flash(200, 53, 224, 200);
     riasec.log("minigame_done", {

@@ -2,6 +2,10 @@ import Phaser from "phaser";
 import { riasec } from "../game/riasec";
 import { sfx } from "../ui/sfx";
 import { tt } from "../game/lang";
+import { createNudge, type NudgeHandle } from "../ui/nudge";
+import { installOtisAssist, type AssistHandle } from "../ui/assist";
+import { askSignature } from "../ui/minichoice";
+import { installAmbientDrift } from "../ui/ambient";
 
 // E-2:六艙電力分配(拖曳滑桿,總量有限)。沒有唯一正解 — 取捨本身即體驗。
 interface BayRow {
@@ -33,15 +37,32 @@ export class PowerGridScene extends Phaser.Scene {
     super("powergrid");
   }
 
+  private nudge?: NudgeHandle;
+  private assist?: AssistHandle;
+
   create(data: { from?: string }) {
     this.from = data?.from ?? "modules";
     this.solved = false;
     this.adjustCount = 0;
     this.startedAt = this.time.now;
+    this.nudge = createNudge(this, {
+      speaker: "范斯",
+      accent: 0xffd700,
+      anchor: { x: 24, y: 92 },
+      lines: [
+        { zh: "別猶豫。指揮就是在有限裡做取捨。", en: "Don't hesitate. Command is making trade-offs with what you have." },
+        { zh: "每個艙都有最低需求 —— 把每條滑桿都拉過它的門檻就算數。", en: "Every bay has a minimum — push each slider past its threshold and it's done." },
+      ],
+    });
+    this.assist = installOtisAssist(this, { onAssist: () => this.solve() });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.nudge?.destroy();
+      this.assist?.destroy();
+    });
     this.rows = [
       { name: tt("動力艙", "Power Bay"), min: 100, value: 70 },
       { name: tt("溫室", "Greenhouse"), min: 60, value: 70 },
-      { name: tt("環形走廊", "Mural Ring"), min: 40, value: 70 },
+      { name: tt("交誼廳", "Lounge"), min: 40, value: 70 },
       { name: tt("醫療艙", "Med Bay"), min: 90, value: 70 },
       { name: tt("指揮中心", "Command"), min: 80, value: 70 },
       { name: tt("資料艙", "Archive"), min: 50, value: 70 },
@@ -49,6 +70,7 @@ export class PowerGridScene extends Phaser.Scene {
 
     this.cameras.main.fadeIn(350, 0, 0, 0);
     this.add.rectangle(480, 270, 960, 540, 0x06090d, 0.9);
+    installAmbientDrift(this, { color: 0xffd700, count: 14, depth: 2, alphaScale: 1.12, sizeScale: 1.05 });
     this.add
       .text(480, 44, tt("分配電力:拖曳各艙滑桿,讓所有艙區達到最低需求", "Allocate power: drag each bay slider above its minimum requirement"), {
         fontFamily: "sans-serif",
@@ -165,6 +187,8 @@ export class PowerGridScene extends Phaser.Scene {
   private solve() {
     if (this.solved) return;
     this.solved = true;
+    this.nudge?.solved();
+    this.assist?.destroy();
     sfx.solve();
     this.cameras.main.flash(200, 53, 224, 200);
     riasec.log("minigame_done", {
@@ -183,12 +207,31 @@ export class PowerGridScene extends Phaser.Scene {
         padding: { x: 14, y: 7 },
       })
       .setOrigin(0.5);
-    this.time.delayedCall(1200, () => {
-      this.cameras.main.fadeOut(400, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => {
-        this.scene.stop();
-        this.scene.resume(this.from);
-      });
-    });
+    this.time.delayedCall(1000, () => this.askSignatureChoice());
+  }
+
+  // 招牌抉擇(計分第 4 題,維度 E):簽核時的決策風格。
+  private askSignatureChoice() {
+    askSignature(
+      this,
+      {
+        speaker: "范斯",
+        accent: 0xffd700,
+        nodeId: "E-3",
+        prompt: { zh: "報表完成。簽核之前,你會?", en: "The report's done. Before you sign off, you?" },
+        options: [
+          { label: { zh: "主動重配、爭取更多餘裕,並下達後續指令。", en: "Reallocate to claim more margin, then issue the next orders." }, weights: { E: 14 } },
+          { label: { zh: "按標準配置簽核就好。", en: "Sign off on the standard allocation." }, weights: { E: 7 } },
+          { label: { zh: "讓系統自動最佳化,我不插手。", en: "Let the system auto-optimize; I won't intervene." }, weights: { E: 2 } },
+        ],
+      },
+      () => {
+        this.cameras.main.fadeOut(400, 0, 0, 0);
+        this.cameras.main.once("camerafadeoutcomplete", () => {
+          this.scene.stop();
+          this.scene.resume(this.from);
+        });
+      },
+    );
   }
 }

@@ -2,6 +2,8 @@
 import { riasec } from "./riasec";
 
 export type PipeVariant = "hands" | "manual" | "assist";
+/** 孢子隔離小遊戲的操作方式變體(由 I-3 的方法選擇決定;只改玩法,不影響計分) */
+export type SporeVariant = "manual" | "inquire" | "verify";
 /** 續玩錨點:續玩時跳回的關卡 */
 export type Stage = "intro" | "hub" | "modules" | "ranking" | "final" | "done";
 
@@ -13,6 +15,7 @@ const BAY_KEYS = ["powerbay", "datalab", "muralhall", "medbay", "command", "work
 export const flow = {
   equipment: "" as string,
   pipeVariant: "hands" as PipeVariant,
+  sporeVariant: "manual" as SporeVariant,
   /** 已完成的艙區 key */
   completedBays: [] as string[],
   /** 中點轉折是否已播 */
@@ -60,6 +63,7 @@ export function saveFlow(stage: Stage = flow.stage): boolean {
       flow: {
         equipment: flow.equipment,
         pipeVariant: flow.pipeVariant,
+        sporeVariant: flow.sporeVariant,
         completedBays: [...flow.completedBays],
         midpointPlayed: flow.midpointPlayed,
         finalChoice: flow.finalChoice,
@@ -128,11 +132,14 @@ function normalizeSave(data: unknown): { flow: FlowState; riasec: unknown } | nu
     : [];
   const pipeVariant =
     saved.pipeVariant === "manual" || saved.pipeVariant === "assist" ? saved.pipeVariant : "hands";
+  const sporeVariant =
+    saved.sporeVariant === "inquire" || saved.sporeVariant === "verify" ? saved.sporeVariant : "manual";
 
   return {
     flow: {
       equipment: typeof saved.equipment === "string" ? saved.equipment : "",
       pipeVariant,
+      sporeVariant,
       completedBays,
       midpointPlayed: Boolean(saved.midpointPlayed),
       finalChoice: saved.finalChoice === 0 || saved.finalChoice === 1 ? saved.finalChoice : -1,

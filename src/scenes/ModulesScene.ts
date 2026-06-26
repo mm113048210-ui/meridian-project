@@ -4,12 +4,15 @@ import { hidePortrait, setPortrait } from "../ui/portrait";
 import { riasec, type Dim } from "../game/riasec";
 import { addRepair, setStage } from "../game/flow";
 import { fitCover } from "./TitleScene";
+import { playMusic } from "../ui/music";
 import { tt } from "../game/lang";
+import { installAmbientDrift, installPointerParallax, installRoomAmbience, installVignette } from "../ui/ambient";
+import { fadeToScene } from "../ui/transition";
 
-// 2.2 四大能力測評模組(Core Missions)
+// 2.2 最終能力測評模組(Core Missions)
 // 流程:模組簡報 → 小遊戲 → 產出物 → 主觀回饋(有趣/無聊 → 偏好加成)
 // ⛔ 表現不計分;「有趣」才 +5 對應維度(偏好,非能力)。
-interface ModuleDef {
+export interface ModuleDef {
   key: string;
   scene: string;
   title: { zh: string; en: string };
@@ -18,7 +21,7 @@ interface ModuleDef {
   dims: Dim[];
 }
 
-const MODULES: ModuleDef[] = [
+export const MODULES: ModuleDef[] = [
   {
     key: "M1",
     scene: "decode",
@@ -35,22 +38,8 @@ const MODULES: ModuleDef[] = [
     deliverable: { zh: "登陸艇圖紙・認證", en: "Lander Blueprint - Certified" },
     dims: ["R", "I"],
   },
-  {
-    key: "M3",
-    scene: "powergrid",
-    title: { zh: "資源拓荒", en: "Resource Allocation" },
-    brief: { zh: "降落前最後一次資源盤點。分配六艙電力,產出平衡報表。", en: "Run the final resource audit before landing. Allocate power across six bays and file a balanced report." },
-    deliverable: { zh: "資源報表・歸檔", en: "Resource Report - Filed" },
-    dims: ["C", "E"],
-  },
-  {
-    key: "M4",
-    scene: "sortpuzzle",
-    title: { zh: "數據風暴", en: "Cargo Data Storm" },
-    brief: { zh: "穿越電離層時貨艙清單全數打散。在亂流中重建分類,寫下危機日誌。", en: "The cargo manifest scattered during ionosphere entry. Rebuild the categories and seal the crisis log." },
-    deliverable: { zh: "危機日誌・封存", en: "Crisis Log - Sealed" },
-    dims: ["C", "R"],
-  },
+  // 註:資源分配(powergrid)已下放至指揮中心 E-3、貨艙分類(sortpuzzle)已下放至
+  //     資料艙 C-3。此處只留 M1/M2 作為降落前的「總驗收認證」,避免機制重複。
 ];
 
 export class ModulesScene extends Phaser.Scene {
@@ -63,17 +52,22 @@ export class ModulesScene extends Phaser.Scene {
     document.getElementById("save-button")?.classList.add("hidden");
     setStage("modules");
     this.cameras.main.fadeIn(500, 0, 0, 0);
+    playMusic(this, "bgm_certification_focus", 0.24);
     const bg = this.add.image(480, 270, "command");
     fitCover(bg, 960, 540);
     this.add.rectangle(480, 270, 960, 540, 0x05080c, 0.55);
+    installVignette(this, { depth: 3 });
+    installAmbientDrift(this, { color: 0x4ec5d8, count: 18, depth: 4, alphaScale: 1.3, sizeScale: 1.12 });
+    installRoomAmbience(this, "command", 5);
+    installPointerParallax(this, bg, { strength: 7, duration: 500 });
     this.run();
   }
 
   private async run() {
-    await systemCard([{ zh: "接近 Kepler-452。", en: "Approaching Kepler-452." }, { zh: "進入最終航段:艦船認證程序。", en: "Entering final phase: ship certification." }], 850);
+    await systemCard([{ zh: "接近 Kepler-452。", en: "Approaching Kepler-452." }, { zh: "進入最終航段:艦船認證。", en: "Entering final phase: ship certification." }], 850);
     setPortrait("otis");
-    await say("奧提斯", { zh: "六位專員已就位。但降落授權需要「程序官親自完成」四項艙船認證作業。", en: "All six specialists are in place. But landing clearance requires the Procedural Officer to personally complete four ship certifications." }, "otis");
-    await say("奧提斯", { zh: "這是規定,程序官。……同時,也是我最後的觀測窗口。", en: "It's regulation, Procedural Officer. ...And also my last window of observation." }, "otis");
+    await say("奧提斯", { zh: "六位專員已就位。但降落授權還需要你親自完成兩項艙船認證。", en: "All six specialists are in place. But landing clearance still requires you to complete two ship certifications yourself." }, "otis");
+    await say("奧提斯", { zh: "這是規定。……也是我最後一次觀測你的機會。", en: "It's regulation. ...And my last chance to observe you." }, "otis");
     hideDialogue();
     hidePortrait();
 
@@ -86,29 +80,28 @@ export class ModulesScene extends Phaser.Scene {
       await this.runMinigame(mod.scene);
 
       // 產出物
-      await say("奧提斯", { zh: `產出物已登錄:【${mod.deliverable.zh}】`, en: `Deliverable registered: ${mod.deliverable.en}` }, "otis");
+      await say("奧提斯", { zh: `已登錄產出物:【${mod.deliverable.zh}】`, en: `Deliverable registered: ${mod.deliverable.en}` }, "otis");
 
       // 主觀回饋:有趣/無聊(L3 偏好訊號)
-      await say("奧提斯", { zh: "回饋採樣:這項作業,對您而言是——", en: "Feedback sample: this task, to you, was —" }, "otis");
+      await say("奧提斯", { zh: "再確認一次。這項作業對你來說是——", en: "One more check. To you, this task was —" }, "otis");
       const fb = await choose([{ label: { zh: "比想像中有趣。", en: "More interesting than expected." } }, { label: { zh: "無聊,純粹是義務。", en: "Boring. Pure obligation." } }]);
       if (fb === 0) {
         mod.dims.forEach((d) => riasec.addResonance(d, true, mod.key));
-        await say("奧提斯", { zh: "「有趣」……已記錄。這個詞在我的資料庫裡,權重很高。", en: "\"Interesting\"... recorded. That word carries a lot of weight in my database." }, "otis");
+        await say("奧提斯", { zh: "「有趣」……已記錄。這個回答很有參考價值。", en: "\"Interesting\"... recorded. That answer is valuable." }, "otis");
       } else {
         riasec.log("module_boring", { id: mod.key });
-        await say("奧提斯", { zh: "已記錄。義務也是一種重量,謝謝您誠實。", en: "Recorded. Obligation is a kind of weight too. Thank you for your honesty." }, "otis");
+        await say("奧提斯", { zh: "已記錄。義務也有重量。謝謝你的誠實。", en: "Recorded. Obligation has weight too. Thank you for your honesty." }, "otis");
       }
       hideDialogue();
       addRepair(4);
     }
 
     setPortrait("otis");
-    await say("奧提斯", { zh: "四項認證,全數完成。降落授權……批准。", en: "All four certifications complete. Landing clearance... approved." }, "otis");
-    await say("奧提斯", { zh: "在入睡之前——最後一站,程序官。休眠艙在等你。", en: "Before you sleep — one last stop, Procedural Officer. The cryo bay is waiting." }, "otis");
+    await say("奧提斯", { zh: "兩項認證全部完成。降落授權……批准。", en: "Both certifications complete. Landing clearance... approved." }, "otis");
+    await say("奧提斯", { zh: "入睡之前,還有最後一站。休眠艙在等你。", en: "Before you sleep, one last stop. The cryo bay is waiting." }, "otis");
     hideDialogue();
     hidePortrait();
-    this.cameras.main.fadeOut(700, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("ranking"));
+    fadeToScene(this, "ranking", { duration: 700 });
   }
 
   private runMinigame(key: string): Promise<void> {

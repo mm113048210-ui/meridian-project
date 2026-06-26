@@ -3,9 +3,11 @@ import { say, hideDialogue } from "../ui/dialogue";
 import { hidePortrait, setPortrait } from "../ui/portrait";
 import { riasec } from "../game/riasec";
 import { sfx } from "../ui/sfx";
+import { playMusic } from "../ui/music";
 import { RANKING_ITEMS, RANK_SCORES } from "../game/script";
 import { setStage } from "../game/flow";
 import { loc, tt } from "../game/lang";
+import { installAmbientDrift } from "../ui/ambient";
 
 // L4 強迫排序:六項成就感由高至低(拖曳排序)。價值觀校準,權重最高的一筆。
 const SLOT_X = 500;
@@ -28,7 +30,9 @@ export class RankingScene extends Phaser.Scene {
     document.getElementById("save-button")?.classList.add("hidden");
     setStage("ranking");
     this.cameras.main.fadeIn(600, 0, 0, 0);
+    playMusic(this, "bgm_final_release", 0.22);
     this.add.rectangle(480, 270, 960, 540, 0x05080c);
+    installAmbientDrift(this, { color: 0xffd700, count: 22, depth: 2, alphaScale: 1.35, sizeScale: 1.2 });
     // 休眠艙白光氛圍
     const glow = this.add.ellipse(480, 270, 900, 480, 0x8b5cf6, 0.06);
     this.tweens.add({ targets: glow, alpha: 0.4, duration: 2600, yoyo: true, repeat: -1 });
@@ -37,16 +41,16 @@ export class RankingScene extends Phaser.Scene {
 
   private async intro() {
     setPortrait("otis");
-    await say("奧提斯", { zh: "休眠艙已就緒。在入睡之前——最後一項記錄,程序官。", en: "The cryo bay is ready. Before you sleep — one last record, Procedural Officer." }, "otis");
+    await say("奧提斯", { zh: "休眠艙已就緒。入睡之前,還有最後一項記錄。", en: "The cryo bay is ready. Before you sleep, one last record." }, "otis");
     await say(
       "奧提斯",
       {
-        zh: "假設你要把「人類的樣子」帶去新世界,但種子的容量有限。以下六種時刻,請依「你願意留下它」的程度,由高至低排序。",
-        en: "Assume you must carry the shape of humanity to a new world, but the seed archive has limited capacity. Rank these six moments from most worth preserving to least.",
+        zh: "假設你只能把有限的「人類樣貌」帶去新世界。以下六種時刻,請依你願意留下的程度,由高到低排序。",
+        en: "Assume you can carry only a limited record of humanity to the new world. Rank these six moments from most worth preserving to least.",
       },
       "otis",
     );
-    await say("奧提斯", { zh: "排在最末的那一項——將不被收錄。請慎重。", en: "The item placed last will not be archived. Choose carefully." }, "otis");
+    await say("奧提斯", { zh: "排在最後的那一項,將不被收錄。請慎重。", en: "The item placed last will not be archived. Choose carefully." }, "otis");
     hideDialogue();
     hidePortrait();
     this.buildBoard();

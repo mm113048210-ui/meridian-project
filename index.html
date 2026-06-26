@@ -9,6 +9,10 @@
       content="一場關於「你是誰」的太空敘事測驗。在星火號上喚醒六位專員,你的每一個選擇都在重新畫出一張人類的自畫像。"
     />
     <meta name="theme-color" content="#05080c" />
+    <!-- 顯示字體:Orbitron(sci-fi 展示體,只用在標題/原型名/Holland code/鑑定書;CJK 自動回退系統字) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&display=swap" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Project Meridian ─ The Last 14%" />
     <meta
@@ -24,16 +28,6 @@
   <body>
     <div id="app">
       <div id="game-root"></div>
-
-      <!-- HUD:只允許中性資訊(時間/修復度)。⛔ 禁止任何 RIASEC 元素 -->
-      <div id="hud" class="hidden" aria-live="polite">
-        <div class="hud-item"><span data-zh="維生倒數" data-en="Life support">維生倒數</span> <strong id="hours">168</strong>h</div>
-        <div class="hud-item repair">
-          <span data-zh="系統修復度" data-en="System repair">系統修復度</span>
-          <div class="repair-track"><div id="repair-fill"></div></div>
-        </div>
-        <button id="save-button" class="hud-save hidden" type="button" data-zh="存檔" data-en="Save">存檔</button>
-      </div>
 
       <!-- 封面(OPUS 風極簡英文版) -->
       <div id="title-ui" class="hidden">
@@ -54,28 +48,128 @@
           <button id="btn-continue" class="title-btn" data-zh="繼續航程" data-en="Continue">繼續航程</button>
           <button id="btn-newgame" class="title-btn ghost" data-zh="重新開始" data-en="New Run">重新開始</button>
         </div>
+        <!-- 完成過航程的回訪者:直接進星圖,不必重跑劇情 -->
+        <button id="btn-starmap" class="title-btn hidden" data-zh="✦ 進入我的星圖" data-en="✦ Enter My Star Map">✦ 進入我的星圖</button>
       </div>
 
-      <!-- VN 立繪 -->
-      <div id="portrait" class="hidden">
-        <div id="portrait-frame">
-          <img id="portrait-img" alt="" />
-          <div id="portrait-badge" class="hidden"></div>
+      <!-- VN 立繪:左右雙槽,無框,透明懸浮 -->
+      <div id="portrait-left" class="portrait-slot side-left hidden">
+        <img class="portrait-img" alt="" />
+        <div class="portrait-badge hidden"></div>
+      </div>
+      <div id="portrait-right" class="portrait-slot side-right hidden">
+        <img class="portrait-img" alt="" />
+        <div class="portrait-badge hidden"></div>
+      </div>
+      <div id="portrait-center" class="portrait-slot side-center hidden">
+        <img class="portrait-img" alt="" />
+        <div class="portrait-badge hidden"></div>
+      </div>
+
+      <!-- MERIDIAN Phone:所有操作資訊收進手機,保持遊戲畫面乾淨 -->
+      <div id="phone-dock" class="hidden">
+        <div id="phone-backdrop"></div>
+        <button id="phone-toggle" type="button" aria-label="MERIDIAN Phone" title="MERIDIAN Phone">▣</button>
+        <div id="phone-panel" class="hidden" role="dialog" aria-label="MERIDIAN Phone">
+          <div class="phone-device">
+            <div class="phone-bezel">
+              <div class="phone-statusbar">
+                <span>MERIDIAN OS</span>
+                <span id="phone-clock">C-742</span>
+              </div>
+
+              <nav class="phone-tabs" aria-label="Phone sections">
+                <button class="phone-tab active" type="button" data-phone-tab="status" data-zh="狀態" data-en="Status">狀態</button>
+                <button class="phone-tab" type="button" data-phone-tab="tasks" data-zh="任務" data-en="Tasks">任務</button>
+                <button class="phone-tab" type="button" data-phone-tab="chat" data-zh="訊息" data-en="Comms">訊息</button>
+                <button class="phone-tab" type="button" data-phone-tab="crew" data-zh="角色" data-en="Crew">角色</button>
+                <button class="phone-tab" type="button" data-phone-tab="dashboard" data-zh="星圖" data-en="Star Map">星圖</button>
+                <button class="phone-tab" type="button" data-phone-tab="career" data-zh="生涯" data-en="Career">生涯</button>
+                <button class="phone-tab" type="button" data-phone-tab="discover" data-zh="發現" data-en="Discover">發現</button>
+                <button class="phone-tab" type="button" data-phone-tab="journey" data-zh="旅程" data-en="Journey">旅程</button>
+                <button class="phone-tab" type="button" data-phone-tab="collection" data-zh="收藏" data-en="Finds">收藏</button>
+              </nav>
+
+              <section id="phone-tab-status" class="phone-page active">
+                <!-- HUD:只允許中性資訊(時間/修復度)。⛔ 禁止任何 RIASEC 元素 -->
+                <div id="hud" class="hidden" aria-live="polite">
+                  <div class="hud-item">
+                    <span data-zh="維生倒數" data-en="Life support">維生倒數</span>
+                    <strong id="hours">168</strong>h
+                  </div>
+                  <div class="hud-item repair">
+                    <span data-zh="系統修復度" data-en="System repair">系統修復度</span>
+                    <div class="repair-track"><div id="repair-fill"></div></div>
+                  </div>
+                </div>
+                <!-- 隨時存檔:快照到最近安全檢查點(檢查點式存檔) -->
+                <button id="phone-save" class="phone-save-primary hidden" type="button" data-zh="✦ 存檔" data-en="✦ Save Progress">✦ 存檔</button>
+                <p id="phone-save-hint" class="phone-save-hint hidden" data-zh="隨時可存。進度會保存到最近的安全檢查點。" data-en="Save anytime. Progress snaps to the latest safe checkpoint.">隨時可存。進度會保存到最近的安全檢查點。</p>
+                <div class="phone-action-grid">
+                  <button id="phone-pause" class="phone-action" type="button" data-zh="暫停" data-en="Pause">暫停</button>
+                  <button id="pace-speed" class="phone-action" type="button">文字速度:標準</button>
+                  <button id="motion-pref" class="phone-action" type="button">動態:系統</button>
+                </div>
+                <div id="pacing" class="hidden">
+                  <span class="pace-hint" data-zh="對話時可用 Space / Enter 推進文字" data-en="Press Space / Enter to advance dialogue">對話時可用 Space / Enter 推進文字</span>
+                </div>
+                <p class="phone-note" data-zh="Space:開關手機 / 對話時推進文字" data-en="Space: phone / advance dialogue">Space:開關手機 / 對話時推進文字</p>
+              </section>
+
+              <section id="phone-tab-tasks" class="phone-page">
+                <div class="task-empty" data-zh="目前沒有進行中的艙區任務。" data-en="No active bay task right now.">目前沒有進行中的艙區任務。</div>
+              </section>
+
+              <section id="phone-tab-chat" class="phone-page">
+                <div class="phone-brief">
+                  <h2 data-zh="任務提示" data-en="Mission Brief">任務提示</h2>
+                  <p data-zh="所有倒數、修復度、存檔和暫停操作都會收在手機裡。主畫面只保留場景、角色與底部對話框。" data-en="Countdown, repair status, save, and pause controls live here. The main view keeps only the scene, portraits, and bottom dialogue.">所有倒數、修復度、存檔和暫停操作都會收在手機裡。主畫面只保留場景、角色與底部對話框。</p>
+                  <p data-zh="後續可在這裡放目前艙區簡介、目標、已收集線索、OTIS 訊息紀錄。" data-en="This page can later hold bay briefs, objectives, collected clues, and OTIS message logs.">後續可在這裡放目前艙區簡介、目標、已收集線索、OTIS 訊息紀錄。</p>
+                </div>
+              </section>
+
+              <section id="phone-tab-crew" class="phone-page">
+                <div class="contact-list">
+                  <button class="contact-card" type="button" data-contact="kyle"><span class="contact-name" data-zh="凱爾" data-en="Kyle">凱爾</span> <span>Power Bay</span></button>
+                  <button class="contact-card" type="button" data-contact="alice"><span class="contact-name" data-zh="艾莉絲" data-en="Alice">艾莉絲</span> <span>Greenhouse</span></button>
+                  <button class="contact-card" type="button" data-contact="laila"><span class="contact-name" data-zh="萊拉" data-en="Laila">萊拉</span> <span>Mural Ring</span></button>
+                  <button class="contact-card" type="button" data-contact="shiya"><span class="contact-name" data-zh="希雅" data-en="Shiya">希雅</span> <span>Med Bay</span></button>
+                  <button class="contact-card" type="button" data-contact="vance"><span class="contact-name" data-zh="范斯" data-en="Vance">范斯</span> <span>Command</span></button>
+                  <button class="contact-card" type="button" data-contact="chen"><span class="contact-name" data-zh="陳靜" data-en="Chen Jing">陳靜</span> <span>Archive</span></button>
+                </div>
+                <p id="contact-reply" class="phone-note" data-zh="選擇角色後,可在下一版接入支線對話。" data-en="Crew side chats can be wired here next.">選擇角色後,可在下一版接入支線對話。</p>
+              </section>
+
+              <section id="phone-tab-dashboard" class="phone-page">
+                <div class="dash-empty" data-zh="完成一次航程後,你的身分鑑定書會出現在這裡。" data-en="Your identity chart appears here after your first voyage.">完成一次航程後,你的身分鑑定書會出現在這裡。</div>
+              </section>
+
+              <section id="phone-tab-career" class="phone-page">
+                <div class="dash-empty" data-zh="完成航程後,這裡會放你的生涯推薦與行動計畫。" data-en="Your career suggestions and action plan will live here after your voyage.">完成航程後,這裡會放你的生涯推薦與行動計畫。</div>
+              </section>
+
+              <section id="phone-tab-discover" class="phone-page">
+                <div class="disc-empty" data-zh="完成航程後,這裡會依你的結果,推給你最貼近的科系故事、學群與可以馬上做的事。" data-en="After your voyage, this feed fills with stories, fields, and next steps matched to your result.">完成航程後,這裡會依你的結果,推給你最貼近的科系故事、學群與可以馬上做的事。</div>
+              </section>
+
+              <section id="phone-tab-journey" class="phone-page">
+                <div class="jm-empty" data-zh="完成航程後,你的長期成長旅程地圖會在這裡展開。" data-en="Your long-term growth journey map opens here after your voyage.">完成航程後,你的長期成長旅程地圖會在這裡展開。</div>
+              </section>
+
+              <section id="phone-tab-collection" class="phone-page">
+                <div class="egg-empty" data-zh="在各艙區的場景裡找找看 —— 點亮的小物件可以收藏。" data-en="Look around each bay — glints on objects can be collected.">在各艙區的場景裡找找看 —— 點亮的小物件可以收藏。</div>
+              </section>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- 對話框 -->
+      <!-- 對話框:保留在底部,不進手機 -->
       <div id="dialogue" class="hidden">
         <div id="speaker" data-style="otis">奧提斯</div>
         <p id="dialogue-text"></p>
         <div id="continue-hint" class="hidden">▼</div>
         <div id="choices" class="hidden"></div>
-      </div>
-
-      <!-- 對話節奏控制列(只在對話時顯示) -->
-      <div id="pacing" class="hidden">
-        <button id="pace-speed">文字速度:標準</button>
-        <span class="pace-hint" data-zh="點擊或按 Space / Enter 繼續" data-en="Click or press Space / Enter to continue">點擊或按 Space / Enter 繼續</span>
       </div>
 
       <!-- 全幕系統字卡 -->

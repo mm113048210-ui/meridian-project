@@ -101,24 +101,42 @@ class RiasecEngine {
   report() {
     const raw: Record<Dim, number> = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
     for (const d of DIMS) {
-      // 校準權重(見檔頭):L2 主導、L4 輔助、resonance 放大(每維上限僅 5)、L1 最小。
-      // L4 末位有負分,剪到 0 避免報告出現負分。
+      // 層權重決定各維的「相對」強弱:L2 主導、L4 輔助、resonance 放大、L1 最小。
+      // L4 末位有負分,剪到 0 避免出現負分。
       raw[d] = Math.max(
         0,
         this.l1[d] * 0.3 + this.l2[d] * 0.45 + this.l4[d] * 0.45 + this.resonance[d] * 1.35,
       );
     }
-    // 固定基準正規化:用「強一致維度」的參考上限當分母 → 保留 profile 強度。
-    // 平均型玩家會呈現中等高度,而非自我最大值造成的全滿格。
-    // REF ≈ 單維 L2 全高(42×0.45)+ 排序第一(25×0.45)+ 本艙共振(5×1.35) ≈ 37。
-    const REF = 38;
-    const scores = Object.fromEntries(
-      DIMS.map((d) => [d, Math.min(100, Math.round((raw[d] / REF) * 100))]),
-    ) as Record<Dim, number>;
-    // 三碼以 raw 排序(非 clamp 後的 scores),避免並列改變順序。
-    const code = [...DIMS].sort((a, b) => raw[b] - raw[a]).slice(0, 3);
-    return { scores, code, telemetry: this.telemetry };
+    return { ...normalizeToReport(raw), telemetry: this.telemetry };
   }
+}
+
+// 相對化(ipsative)正規化 —— 抽成共用純函式,讓「完整航程」與「快速重測短式量表」
+// 用同一套計分數學,雷達圖才可比較。
+// RIASEC 是「個人內」的相對興趣;固定基準的絕對累加會讓多數維都很高(雷達圖滿格無特徵)。
+// 改以玩家自身分布為基準,把最弱→最強對稱映射到以 50 為中心:
+//   • 顯示分數平均恆為 ~50 → 數學上不可能六維全高,一定有高低區別。
+//   • concentration:六維差異越大展開越開(明確尖峰);差異很小則收斂中段(不放大雜訊)。
+//   • Holland code 仍以原始強度(raw)排序,反映真實偏好順序。
+export function normalizeToReport(raw: Record<Dim, number>): {
+  scores: Record<Dim, number>;
+  code: Dim[];
+} {
+  const vals = DIMS.map((d) => raw[d]);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const range = hi - lo;
+  const concentration = range / (range + 12);
+  const half = 44 * concentration; // 最強 ≈ 50+half、最弱 ≈ 50-half
+  const scores = Object.fromEntries(
+    DIMS.map((d) => {
+      const t = range > 0 ? (raw[d] - lo) / range : 0.5; // 0(最弱)..1(最強)
+      return [d, Math.max(0, Math.min(100, Math.round(50 + (t - 0.5) * 2 * half)))];
+    }),
+  ) as Record<Dim, number>;
+  const code = [...DIMS].sort((a, b) => raw[b] - raw[a]).slice(0, 3);
+  return { scores, code };
 }
 
 export const riasec = new RiasecEngine();

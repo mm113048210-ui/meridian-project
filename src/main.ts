@@ -1,6 +1,7 @@
 import Phaser from "phaser";
-import { BootScene } from "./scenes/BootScene";
+import { BootScene } from "./scenes/BootScene.1";
 import { TitleScene } from "./scenes/TitleScene";
+import { PrologueScene } from "./scenes/PrologueScene";
 import { EquipScene } from "./scenes/EquipScene";
 import { AwakeningScene } from "./scenes/AwakeningScene";
 import { HubScene } from "./scenes/HubScene";
@@ -8,14 +9,22 @@ import { BayScene } from "./scenes/BayScene";
 import { ModulesScene } from "./scenes/ModulesScene";
 import { DecodeScene } from "./scenes/DecodeScene";
 import { PipePuzzleScene } from "./scenes/PipePuzzleScene";
+import { SporeIsolationScene } from "./scenes/SporeIsolationScene";
+import { HoldFillScene } from "./scenes/HoldFillScene";
+import { VitalScanScene } from "./scenes/VitalScanScene";
+import { AssembleScene } from "./scenes/AssembleScene";
 import { PowerGridScene } from "./scenes/PowerGridScene";
 import { SortPuzzleScene } from "./scenes/SortPuzzleScene";
 import { SeqPuzzleScene } from "./scenes/SeqPuzzleScene";
 import { RankingScene } from "./scenes/RankingScene";
 import { FinalScene } from "./scenes/FinalScene";
+import { HomeScene } from "./scenes/HomeScene";
+import { RetestScene } from "./scenes/RetestScene";
 import { riasec } from "./game/riasec";
 import { flow } from "./game/flow";
 import { initPacing } from "./ui/pacing";
+import { initPhoneUI } from "./ui/phone";
+import { initDevTools } from "./ui/devtools";
 import "./styles.css";
 
 initPacing();
@@ -60,6 +69,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [
     BootScene,
     TitleScene,
+    PrologueScene,
     EquipScene,
     AwakeningScene,
     HubScene,
@@ -67,11 +77,17 @@ const config: Phaser.Types.Core.GameConfig = {
     ModulesScene,
     DecodeScene,
     PipePuzzleScene,
+    SporeIsolationScene,
+    HoldFillScene,
+    VitalScanScene,
+    AssembleScene,
     PowerGridScene,
     SortPuzzleScene,
     SeqPuzzleScene,
     RankingScene,
     FinalScene,
+    HomeScene,
+    RetestScene,
   ],
 };
 
@@ -99,3 +115,23 @@ w.__game = game;
 w.__riasec = riasec;
 w.__flow = flow;
 w.__ss = SS;
+
+initPhoneUI();
+initDevTools();
+
+// 分頁失焦自動暫停:切到別的分頁/視窗時,暫停進行中的場景(省電、停掉循環動畫);
+// 回來時只恢復「我們自動暫停的」場景,不碰使用者手動暫停的(那些已不在 active 清單)。
+const autoPaused = new Set<string>();
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    game.scene.getScenes(true).forEach((s) => {
+      const key = s.scene.key;
+      if (key === "boot" || key === "title") return;
+      autoPaused.add(key);
+      game.scene.pause(key);
+    });
+  } else {
+    autoPaused.forEach((key) => game.scene.resume(key));
+    autoPaused.clear();
+  }
+});

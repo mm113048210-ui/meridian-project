@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { riasec } from "../game/riasec";
 import { sfx } from "../ui/sfx";
 import { loc, tt, type LS } from "../game/lang";
+import { installAmbientDrift } from "../ui/ambient";
 
 // M1 通訊解碼(語文推理):依符號對照表,從候選中選出正確譯文。
 // 表現不計分,只記遙測。答錯不懲罰,標紅後可再選。
@@ -51,8 +52,11 @@ export class DecodeScene extends Phaser.Scene {
   private from = "modules";
   private round = 0;
   private misses = 0;
+  private roundMisses = 0;
   private startedAt = 0;
   private roundObjs: Phaser.GameObjects.GameObject[] = [];
+  private optionCells: { box: Phaser.GameObjects.Rectangle; idx: number; dimmed: boolean }[] = [];
+  private assistLine?: Phaser.GameObjects.Text;
   private wave!: Phaser.GameObjects.Graphics;
   private noise = 1; // 訊號雜訊振幅(解出後歸零)
   private scrambleEvt?: Phaser.Time.TimerEvent;
@@ -69,6 +73,7 @@ export class DecodeScene extends Phaser.Scene {
     this.startedAt = this.time.now;
     this.cameras.main.fadeIn(350, 0, 0, 0);
     this.add.rectangle(480, 270, 960, 540, 0x06090d, 0.92);
+    installAmbientDrift(this, { color: 0x00f5ff, count: 20, depth: 2, alphaScale: 1.5, sizeScale: 1.28 });
     this.add
       .text(480, 46, tt("修復殘缺訊號:對照符號表,選出正確譯文", "Repair the broken signal: use the symbol key to choose the correct translation"), {
         fontFamily: "sans-serif",
@@ -100,6 +105,8 @@ export class DecodeScene extends Phaser.Scene {
   private showRound() {
     this.roundObjs.forEach((o) => o.destroy());
     this.roundObjs = [];
+    this.optionCells = [];
+    this.roundMisses = 0;
     const r = ROUNDS[this.round];
 
     const progress = this.add
@@ -126,7 +133,13 @@ export class DecodeScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.roundObjs.push(progress, cipherBox, cipher, hints);
+    // OTIS 漸進輔助提示行(預設隱藏,卡關時淡入)
+    this.assistLine = this.add
+      .text(480, 248, "", { fontFamily: "sans-serif", fontSize: "13px", color: "#7fd4c4" })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.roundObjs.push(progress, cipherBox, cipher, hints, this.assistLine);
 
     r.options.forEach((opt, i) => {
       const y = 286 + i * 64;
@@ -138,6 +151,7 @@ export class DecodeScene extends Phaser.Scene {
         .text(480, y, loc(opt), { fontFamily: "sans-serif", fontSize: "18px", color: "#e8f6ff" })
         .setOrigin(0.5);
       this.roundObjs.push(box, txt);
+      this.optionCells.push({ box, idx: i, dimmed: false });
 
       box.on("pointerover", () => {
         box.setStrokeStyle(2, 0x00f5ff);
@@ -151,12 +165,42 @@ export class DecodeScene extends Phaser.Scene {
           this.time.delayedCall(350, () => this.next());
         } else {
           this.misses += 1;
+          this.roundMisses += 1;
           sfx.alarm();
           box.setFillStyle(0x3a1620);
           this.cameras.main.shake(120, 0.002);
+          this.assistAfterMiss(r.answer);
         }
       });
     });
+  }
+
+  // 漸進輔助(Buster 動態難度 + 面包屑):失敗只驅動「幫助」,從不計分(鐵則)。
+  //   2 次 → 淡出一個錯誤選項(Hick 定律:減少選項)
+  //   3 次+→ 高亮正確答案,保證玩家能前進,絕不硬卡死
+  private assistAfterMiss(answer: number) {
+    if (this.roundMisses === 2) {
+      const wrong = this.optionCells.find((c) => c.idx !== answer && !c.dimmed);
+      if (wrong) {
+        wrong.dimmed = true;
+        wrong.box.disableInteractive();
+        this.tweens.add({ targets: wrong.box, alpha: 0.18, duration: 300 });
+        this.showAssist(tt("OTIS：排除一個雜訊片段，集中比對。", "OTIS: Filtered out one noisy fragment. Focus your match."));
+      }
+    } else if (this.roundMisses >= 3) {
+      const right = this.optionCells.find((c) => c.idx === answer);
+      if (right) {
+        right.box.setStrokeStyle(3, 0x35e0c8, 0.9);
+        this.tweens.add({ targets: right.box, alpha: { from: 0.6, to: 1 }, duration: 520, yoyo: true, repeat: -1 });
+        this.showAssist(tt("OTIS：訊號比對完成——試試發亮的那一行。", "OTIS: Match complete — try the highlighted line."));
+      }
+    }
+  }
+
+  private showAssist(msg: string) {
+    if (!this.assistLine) return;
+    this.assistLine.setText(msg);
+    this.tweens.add({ targets: this.assistLine, alpha: 1, duration: 260 });
   }
 
   // 亂碼 → 鎖定:每格符號快速跳動約 0.5 秒後定格為真密文

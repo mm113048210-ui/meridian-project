@@ -1,6 +1,6 @@
 // DOM 對話系統:打字機效果 + 選項。CJK 用 DOM 渲染比 canvas 清晰。
 import { sfx } from "./sfx";
-import { setPortrait, bouncePortrait } from "./portrait";
+import { setPortrait, bouncePortrait, portraitForSpeaker } from "./portrait";
 import { pacing } from "./pacing";
 import { loc, speakerName, type LS } from "../game/lang";
 import type { Line } from "../game/script";
@@ -11,30 +11,56 @@ const textEl = () => document.getElementById("dialogue-text")!;
 const hintEl = () => document.getElementById("continue-hint")!;
 const choicesEl = () => document.getElementById("choices")!;
 const paceBar = () => document.getElementById("pacing");
+const root = () => document.documentElement;
+
+function syncDialogueMetrics() {
+  const el = box();
+  root().style.setProperty("--dialogue-height", `${Math.ceil(el.offsetHeight)}px`);
+}
+
+const dialogueObserver = new ResizeObserver(syncDialogueMetrics);
+requestAnimationFrame(() => {
+  dialogueObserver.observe(box());
+  syncDialogueMetrics();
+});
+window.addEventListener("resize", syncDialogueMetrics);
 
 export type SpeakerStyle = "otis" | "kyle" | "self" | "system";
 
 export function showDialogue() {
   box().classList.remove("hidden");
   paceBar()?.classList.remove("hidden");
+  requestAnimationFrame(syncDialogueMetrics);
 }
 export function hideDialogue() {
   box().classList.add("hidden");
   choicesEl().classList.add("hidden");
   paceBar()?.classList.add("hidden");
+  setPortrait("");
 }
 
 /** 依序播放一段 Line[](含立繪切換) */
 export async function playLines(lines: Line[]): Promise<void> {
   for (const line of lines) {
-    setPortrait(line.portrait);
-    await say(line.who, line.text, line.style);
+    setPortrait(line.portrait); // 劇本各行自帶立繪(含表情變體)
+    await say(line.who, line.text, line.style, null); // null = 不覆蓋上面已設定的立繪
   }
 }
 
-/** 打字機顯示一句話,點擊先跳完、再點繼續。評測流程不提供跳過/自動推進。 */
-export function say(speaker: string, text: LS, style: SpeakerStyle = "otis"): Promise<void> {
+/**
+ * 打字機顯示一句話,點擊先跳完、再點繼續。評測流程不提供跳過/自動推進。
+ * portrait 參數:undefined = 依說話者自動設定(OTIS/各專員;玩家「你」沿用前一位);
+ * null = 不更動立繪(供 playLines 自行控制);字串 = 指定立繪 key。
+ */
+export function say(
+  speaker: string,
+  text: LS,
+  style: SpeakerStyle = "otis",
+  portrait?: string | null,
+): Promise<void> {
   return new Promise((resolve) => {
+    // portrait: null=不更動(playLines 自管);否則依說話者解析,玩家「你」等無立繪者→清空(不殘留)
+    if (portrait !== null) setPortrait(portrait ?? portraitForSpeaker(speaker) ?? "");
     const shownText = loc(text);
     showDialogue();
     bouncePortrait();
@@ -61,6 +87,7 @@ export function say(speaker: string, text: LS, style: SpeakerStyle = "otis"): Pr
     function finish() {
       if (typeTimer) clearTimeout(typeTimer);
       el.textContent = shownText;
+      syncDialogueMetrics();
       done = true;
       hintEl().classList.remove("hidden");
     }
@@ -99,6 +126,7 @@ export function choose(options: Choice[]): Promise<number> {
     wrap.innerHTML = "";
     wrap.classList.remove("hidden");
     hintEl().classList.add("hidden");
+    requestAnimationFrame(syncDialogueMetrics);
     options.forEach((opt, idx) => {
       const b = document.createElement("button");
       b.className = "choice";

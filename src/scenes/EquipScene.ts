@@ -2,7 +2,10 @@ import Phaser from "phaser";
 import { riasec, type Dim } from "../game/riasec";
 import { flow } from "../game/flow";
 import { sfx } from "../ui/sfx";
+import { playMusic } from "../ui/music";
 import { loc, tt, type LS } from "../game/lang";
+import { installAmbientDrift } from "../ui/ambient";
+import { fadeToScene } from "../ui/transition";
 
 // ⛔ 隱性評估:卡面只有名稱+功能描述。維度對應只存在於這份內部資料,
 //    所有卡片外框同色,不得出現 R/I/A/S/E/C 或維度配色。
@@ -54,8 +57,10 @@ export class EquipScene extends Phaser.Scene {
 
   create() {
     this.chosen = false;
+    playMusic(this, "bgm_title_drift", 0.24);
     this.cameras.main.fadeIn(500, 13, 27, 42);
     this.add.rectangle(480, 270, 960, 540, 0x0d1b2a);
+    installAmbientDrift(this, { color: 0x00f5ff, count: 20, depth: 2, alphaScale: 1.45, sizeScale: 1.25 });
 
     this.add
       .text(480, 56, tt("緊急協議:艙內環境不穩定,僅能攜帶一項核心裝備。", "Emergency protocol: the ship is unstable. You may carry one core tool."), {
@@ -115,8 +120,7 @@ export class EquipScene extends Phaser.Scene {
         riasec.pickEquipment(eq.dim);
         flow.equipment = loc(eq.name);
         this.cameras.main.flash(120, 0, 245, 255);
-        this.cameras.main.fadeOut(700, 0, 0, 0);
-        this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("awakening"));
+        fadeToScene(this, "awakening", { duration: 700 });
       });
     });
   }
